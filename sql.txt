@@ -1,0 +1,55 @@
+CREATE TABLE intermedia (
+ quarter TEXT NOT null CHECK(quarter SIMILAR TO 'Q(1|2|3|4)/%'),
+ month TEXT NOT null,
+ week TEXT NOT null CHECK(week SIMILAR TO 'W(1|2|3|4|5)-%'),
+ product_type TEXT NOT null,
+ territory TEXT NOT null,
+ sales_channel TEXT NOT null CHECK(sales_channel IN ('Direct', 'Internet', 'Retail')),
+ customer_type TEXT NOT null,
+ revenue FLOAT CHECK(revenue > 0),
+ cost FLOAT CHECK(cost > 0),
+PRIMARY KEY(month, week, product_type, territory, sales_channel, customer_type)
+);
+
+
+CREATE TABLE definitiva (
+	sales_date DATE not NULL,
+ product_type TEXT NOT null,
+ territory TEXT NOT null,
+ sales_channel TEXT NOT null CHECK(sales_channel IN ('Direct', 'Internet', 'Retail')),
+ customer_type TEXT NOT null,
+ revenue FLOAT CHECK(revenue > 0),
+ cost FLOAT CHECK(cost > 0),
+PRIMARY KEY(sales_date, product_type, territory, sales_channel, customer_type)
+);
+
+
+
+CREATE OR REPLACE FUNCTION toDate
+(
+ quarter IN intermedia.quarter%type,
+	week IN intermedia.week%type,
+	month IN intermedia.month%type
+) RETURNS DATE
+AS $$
+DECLARE
+yearStr TEXT;
+monthStr TEXT;
+dayStr TEXT;
+BEGIN
+	yearStr := SUBSTRING(quarter,4,7);
+	SELECT CAST(EXTRACT(MONTH FROM TO_DATE(SUBSTRING(month,4,6), 'Mon')) AS TEXT) INTO monthStr;
+	monthStr:= LPAD(monthStr,2,'0');
+	CASE (SUBSTRING(week,1,2))
+		WHEN 'W1' then dayStr := '01';
+		WHEN 'W2' then dayStr := '08';
+		WHEN 'W3' then dayStr := '15';
+		WHEN 'W4' then dayStr := '22';
+		WHEN 'W5' then dayStr := '29';
+	END CASE;
+
+ RETURN TO_DATE(yearStr || monthStr || dayStr,'YYYYMMDD');
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT toDate(quarter,week,month) FROM intermedia;
