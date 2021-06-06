@@ -1,35 +1,35 @@
 CREATE TABLE intermedia (
- quarter TEXT NOT null CHECK(quarter SIMILAR TO 'Q(1|2|3|4)/%'),
- month TEXT NOT null,
- week TEXT NOT null CHECK(week SIMILAR TO 'W(1|2|3|4|5)-%'),
- product_type TEXT NOT null,
- territory TEXT NOT null,
- sales_channel TEXT NOT null CHECK(sales_channel IN ('Direct', 'Internet', 'Retail')),
- customer_type TEXT NOT null,
- revenue FLOAT CHECK(revenue > 0),
- cost FLOAT CHECK(cost > 0),
-PRIMARY KEY(month, week, product_type, territory, sales_channel, customer_type)
+	quarter TEXT NOT NULL CHECK(quarter SIMILAR TO 'Q(1|2|3|4)/%'),
+	month TEXT NOT NULL CHECK(SUBSTRING(month,1,2) = SUBSTRING(quarter,6,7)),
+	week TEXT NOT NULL CHECK(week SIMILAR TO 'W(1|2|3|4|5)-%' AND SUBSTRING(week,4,7) = SUBSTRING(quarter,4,7)),
+	product_type TEXT NOT NULL,
+	territory TEXT NOT NULL,
+	sales_channel TEXT NOT NULL CHECK(sales_channel IN ('Direct', 'Internet', 'Retail')),
+	customer_type TEXT NOT NULL,
+	revenue FLOAT CHECK(revenue > 0),
+	cost FLOAT CHECK(cost > 0),
+	PRIMARY KEY(month, week, product_type, territory, sales_channel, customer_type)
 );
 
 
 CREATE TABLE definitiva (
 	sales_date DATE not NULL,
- product_type TEXT NOT null,
- territory TEXT NOT null,
- sales_channel TEXT NOT null CHECK(sales_channel IN ('Direct', 'Internet', 'Retail')),
- customer_type TEXT NOT null,
- revenue FLOAT CHECK(revenue > 0),
- cost FLOAT CHECK(cost > 0),
-PRIMARY KEY(sales_date, product_type, territory, sales_channel, customer_type)
+	product_type TEXT NOT NULL,
+	territory TEXT NOT NULL,
+	sales_channel TEXT NOT NULL CHECK(sales_channel IN ('Direct', 'Internet', 'Retail')),
+	customer_type TEXT NOT NULL,
+	revenue FLOAT CHECK(revenue > 0),
+	cost FLOAT CHECK(cost > 0),
+	PRIMARY KEY(sales_date, product_type, territory, sales_channel, customer_type)
 );
 
 
 
 CREATE OR REPLACE FUNCTION toDate
 (
- quarter IN intermedia.quarter%type,
-	week IN intermedia.week%type,
-	month IN intermedia.month%type
+quarter IN intermedia.quarter%type,
+week IN intermedia.week%type,
+month IN intermedia.month%type
 ) RETURNS DATE
 AS $$
 DECLARE
@@ -47,9 +47,19 @@ BEGIN
 		WHEN 'W4' then dayStr := '22';
 		WHEN 'W5' then dayStr := '29';
 	END CASE;
-
  RETURN TO_DATE(yearStr || monthStr || dayStr,'YYYYMMDD');
 END;
 $$ LANGUAGE plpgsql;
 
-SELECT toDate(quarter,week,month) FROM intermedia;
+
+CREATE OR REPLACE FUNCTION intToDef() RETURNS trigger AS $intToDef$
+BEGIN
+INSERT INTO definitiva VALUES(toDate(new.quarter,new.week,new.month),new.product_type,new.territory,new.sales_channel,new.customer_type,
+							 new.revenue,new.cost);
+RETURN NEW;
+END;
+$intToDef$ LANGUAGE plpgsql;
+
+CREATE TRIGGER intToDef BEFORE INSERT ON intermedia
+FOR EACH ROW
+EXECUTE PROCEDURE intToDef();
