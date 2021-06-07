@@ -63,3 +63,32 @@ $intToDef$ LANGUAGE plpgsql;
 CREATE TRIGGER intToDef BEFORE INSERT ON intermedia
 FOR EACH ROW
 EXECUTE PROCEDURE intToDef();
+
+
+CREATE OR REPLACE FUNCTION MedianaMargenMovil
+(
+date IN DATE,
+n IN INTEGER
+) RETURNS NUMERIC
+AS $$
+DECLARE
+ans NUMERIC;
+limit_date DATE;
+interval_months INTERVAL;
+BEGIN
+	IF (n <= 0) THEN
+	raise notice 'La cantidad de meses anteriores debe ser mayor a 0';
+	RETURN NULL;
+	END IF;
+	interval_months:= make_interval(0,n,0,0,0,0,0);
+	limit_date:= date - interval_months;
+	SELECT percentile_cont(0.5) within group (order by revenue-cost) 
+	FROM definitiva
+	WHERE sales_date <= date and sales_date > limit_date
+	INTO ans;
+	
+ 	RETURN ROUND(ans,2);
+END;
+$$ LANGUAGE plpgsql;
+
+SELECT MedianaMargenMovil(to_date('2011-09-01','YYYY-MM-DD'),5);
