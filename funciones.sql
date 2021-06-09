@@ -156,6 +156,7 @@ DECLARE
         from UNION_CAT where year < (SELECT MIN(year) from UNION_CAT) + n;
     RCSALES RECORD;
     row_count INTEGER;
+    year_to_print TEXT;
 BEGIN
     IF (n < 0) THEN
         raise notice 'La cantidad de años debe ser positiva';
@@ -180,13 +181,14 @@ BEGIN
             ROUND(TOTALYEAR.acum_rev), ROUND(TOTALYEAR.acum_cost), ROUND(TOTALYEAR.acum_margin);
             END IF;
             raise notice '----------------------------------------------------------------------------------------------------------------------';
-            raise notice '%   %:%                               %   %   %',
-            RCSALES.year, RCSALES.category_type,RCSALES.category,ROUND(RCSALES.revenue),ROUND(RCSALES.cost),ROUND(RCSALES.margin); 
+            year_to_print := CAST(RCSALES.year AS TEXT);
             year_ant := RCSALES.year;
         ELSE
-            raise notice '%   %:%                               %   %   %',
-            '----', RCSALES.category_type,RCSALES.category,ROUND(RCSALES.revenue),ROUND(RCSALES.cost),ROUND(RCSALES.margin);
+            year_to_print := '----';
         END IF;
+
+        raise notice '%   %: %                               %   %   %',
+        year_to_print, RCSALES.category_type,RCSALES.category,ROUND(RCSALES.revenue),ROUND(RCSALES.cost),ROUND(RCSALES.margin);
     END LOOP;
     IF year_ant != -1 THEN
         TOTALYEAR = getTotals(year_ant);
