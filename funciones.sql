@@ -8,8 +8,8 @@ CREATE TABLE intermedia
     territory     TEXT NOT NULL,
     sales_channel TEXT NOT NULL CHECK (sales_channel IN ('Direct', 'Internet', 'Retail')),
     customer_type TEXT NOT NULL,
-    revenue       FLOAT CHECK (revenue > 0),
-    cost          FLOAT CHECK (cost > 0),
+    revenue       FLOAT CHECK (revenue >= 0),
+    cost          FLOAT CHECK (cost >= 0),
     PRIMARY KEY (month, week, product_type, territory, sales_channel, customer_type)
 );
 
@@ -21,8 +21,8 @@ CREATE TABLE definitiva
     territory     TEXT NOT NULL,
     sales_channel TEXT NOT NULL CHECK (sales_channel IN ('Direct', 'Internet', 'Retail')),
     customer_type TEXT NOT NULL,
-    revenue       FLOAT CHECK (revenue > 0),
-    cost          FLOAT CHECK (cost > 0),
+    revenue       FLOAT CHECK (revenue >= 0),
+    cost          FLOAT CHECK (cost >= 0),
     PRIMARY KEY (sales_date, product_type, territory, sales_channel, customer_type)
 );
 
@@ -92,8 +92,7 @@ BEGIN
     limit_date := date - interval_months;
     SELECT percentile_cont(0.5) within group (order by revenue - cost)
     FROM definitiva
-    WHERE sales_date <= date
-      and sales_date > limit_date
+    WHERE sales_date <= date AND sales_date > limit_date
     INTO ans;
 
     RETURN ROUND(ans, 2);
@@ -101,7 +100,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 SELECT MedianaMargenMovil(to_date('2011-09-01', 'YYYY-MM-DD'), 5);
-SELECT MedianaMargenMovil(to_date('2012-11-01','YYYY-MM-DD'),4)
+SELECT MedianaMargenMovil(to_date('2012-11-01','YYYY-MM-DD'), 4);
 
 
 CREATE VIEW UNION_CAT (year, category, revenue, cost, margin, category_type)
@@ -134,7 +133,7 @@ AS $$
 DECLARE
 totals RECORD;
 BEGIN
-	SELECT sum(revenue) as acum_rev,sum(cost) as acum_cost,sum(revenue-cost) as acum_margin
+	SELECT SUM(revenue) as acum_rev,SUM(cost) as acum_cost,SUM(revenue-cost) as acum_margin
 	FROM definitiva
 	WHERE EXTRACT(YEAR FROM sales_date) = year
 	INTO totals;
@@ -152,8 +151,8 @@ DECLARE
     TOTALYEAR RECORD;
     year_ant INTEGER := -1;
     CSALES CURSOR FOR
-        SELECT year, category, revenue, cost, margin, category_type
-        from UNION_CAT where year < (SELECT MIN(year) from UNION_CAT) + n;
+        SELECT *
+        FROM UNION_CAT WHERE year < (SELECT MIN(year) FROM UNION_CAT) + n;
     RCSALES RECORD;
     row_count INTEGER;
     year_to_print TEXT;
@@ -168,8 +167,8 @@ BEGIN
     END IF;
 
     raise notice  '--------------------------------------------HISTORIC SALES REPORT---------------------------------------------------';
-    raise notice '----------------------------------------------------------------------------------------------------------------------';
-    raise notice  'Year--------Category-------------------------------------------Revenue------Cost------ Margin------------------------';
+    raise notice '---------------------------------------------------------------------------------------------------------------------';
+    raise notice  'Year--------Category-------------------------------------------Revenue------Cost------ Margin-----------------------';
     OPEN CSALES;
     LOOP
         FETCH CSALES INTO RCSALES;
@@ -177,10 +176,10 @@ BEGIN
         IF year_ant != RCSALES.year THEN
             IF year_ant != -1 THEN
             TOTALYEAR = getTotals(year_ant);
-            raise notice  '--------------------------------------------------------%   %   %', 
+            raise notice  '--------------------------------------------------------  %   %   %', 
             ROUND(TOTALYEAR.acum_rev), ROUND(TOTALYEAR.acum_cost), ROUND(TOTALYEAR.acum_margin);
             END IF;
-            raise notice '----------------------------------------------------------------------------------------------------------------------';
+            raise notice '---------------------------------------------------------------------------------------------------------------------';
             year_to_print := CAST(RCSALES.year AS TEXT);
             year_ant := RCSALES.year;
         ELSE
@@ -190,10 +189,12 @@ BEGIN
         raise notice '%   %: %                               %   %   %',
         year_to_print, RCSALES.category_type,RCSALES.category,ROUND(RCSALES.revenue),ROUND(RCSALES.cost),ROUND(RCSALES.margin);
     END LOOP;
+
     IF year_ant != -1 THEN
         TOTALYEAR = getTotals(year_ant);
-        raise notice  '--------------------------------------------------------%   %   %', ROUND(TOTALYEAR.acum_rev), ROUND(TOTALYEAR.acum_cost), ROUND(TOTALYEAR.acum_margin);
+        raise notice  '--------------------------------------------------------  %   %   %', ROUND(TOTALYEAR.acum_rev), ROUND(TOTALYEAR.acum_cost), ROUND(TOTALYEAR.acum_margin);
     END IF;
+
     CLOSE CSALES;
     END
 $$ LANGUAGE PLPGSQL;
