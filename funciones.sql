@@ -100,6 +100,11 @@ BEGIN
     WHERE sales_date <= date AND sales_date > limit_date
     INTO ans;
 
+    IF ans IS NULL THEN
+        raise notice 'No hay datos para el lapso de tiempo dado';
+        RETURN NULL;
+    END IF;
+
     RETURN ROUND(ans, 2);
 END;
 $$ LANGUAGE plpgsql;
