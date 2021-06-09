@@ -6,7 +6,7 @@ CREATE TABLE intermedia
                                        SUBSTRING(week, 4, 7) = SUBSTRING(quarter, 4, 7)),
     product_type  TEXT NOT NULL,
     territory     TEXT NOT NULL,
-    sales_channel TEXT NOT NULL CHECK (sales_channel IN ('Direct', 'Internet', 'Retail')),
+    sales_channel TEXT NOT NULL,
     customer_type TEXT NOT NULL,
     revenue       FLOAT CHECK (revenue >= 0),
     cost          FLOAT CHECK (cost >= 0),
@@ -16,10 +16,10 @@ CREATE TABLE intermedia
 
 CREATE TABLE definitiva
 (
-    sales_date    DATE not NULL,
+    sales_date    DATE NOT NULL,
     product_type  TEXT NOT NULL,
     territory     TEXT NOT NULL,
-    sales_channel TEXT NOT NULL CHECK (sales_channel IN ('Direct', 'Internet', 'Retail')),
+    sales_channel TEXT NOT NULL,
     customer_type TEXT NOT NULL,
     revenue       FLOAT CHECK (revenue >= 0),
     cost          FLOAT CHECK (cost >= 0),
@@ -52,6 +52,11 @@ BEGIN
         END CASE;
 
     RETURN TO_DATE(year_str || month_str || day_str, 'YYYYMMDD');
+
+    EXCEPTION
+    WHEN OTHERS THEN
+        raise notice 'Bad formatting, quarter should be of shape "Q(1-2-3-4)/YYYY", week should be of shape "W(1-2-3-4-5)-YYY"
+         and month should be of shape "YY-MON", - - % %', SQLSTATE, SQLERRM; 
 END;
 $$ LANGUAGE plpgsql;
 
@@ -67,7 +72,7 @@ END;
 $intToDef$ LANGUAGE plpgsql;
 
 CREATE TRIGGER intToDef
-    BEFORE INSERT
+    AFTER INSERT
     ON intermedia
     FOR EACH ROW
 EXECUTE PROCEDURE intToDef();
@@ -92,16 +97,12 @@ BEGIN
     limit_date := date - interval_months;
     SELECT percentile_cont(0.5) within group (order by revenue - cost)
     FROM definitiva
-    WHERE sales_date <= date
-      AND sales_date > limit_date
+    WHERE sales_date <= date AND sales_date > limit_date
     INTO ans;
 
     RETURN ROUND(ans, 2);
 END;
 $$ LANGUAGE plpgsql;
-
-SELECT MedianaMargenMovil(to_date('2011-09-01', 'YYYY-MM-DD'), 5);
-SELECT MedianaMargenMovil(to_date('2012-11-01', 'YYYY-MM-DD'), 4);
 
 
 CREATE VIEW UNION_CAT (year, category, revenue, cost, margin, category_type)
@@ -208,4 +209,4 @@ BEGIN
 END
 $$ LANGUAGE PLPGSQL;
 
-SELECT ReporteVentas(0);
+SELECT ReporteVentas(1);
