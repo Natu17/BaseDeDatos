@@ -101,6 +101,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 SELECT MedianaMargenMovil(to_date('2011-09-01', 'YYYY-MM-DD'), 5);
+SELECT MedianaMargenMovil(to_date('2012-11-01','YYYY-MM-DD'),4)
 
 
 CREATE VIEW unionCat (year, category, revenue, cost, margin, categoryType)
@@ -166,25 +167,27 @@ BEGIN
     FETCH CSALES INTO RCSALES;
     EXIT WHEN NOT FOUND;
     IF yearAnt=0 then
-        raise notice  '-----------------HISTORIC SALES REPORT-----------------------';
+        raise notice  '--------------------------------------------HISTORIC SALES REPORT---------------------------------------------------';
+        raise notice '---------------------------------------------------------------------------------------------------------------------------------------------';
         raise notice  'Year-------------Category------------Revenue----------Cost---------------- Margin--------------------------';
         SELECT RCSALES.year INTO yearAnt;
         raise notice '%',RCSALES.year ;
     ELSE IF yearAnt < RCSALES.year THEN
         TOTALYEAR = getTotals(yearAnt);
-        raise notice  '% % %', TOTALYEAR.acumRev, TOTALYEAR.acumCost, TOTALYEAR.acumMargin;
+        raise notice  '---------------------------------------------% % %', ROUND(TOTALYEAR.acumRev), ROUND(TOTALYEAR.acumCost), ROUND(TOTALYEAR.acumMargin);
+        raise notice '---------------------------------------------------------------------------------------------------------------------------------------------';
         SELECT RCSALES.year INTO yearAnt;
         raise notice '%',RCSALES.year ;
     END IF;
     END IF;
-        raise notice '%: % % %',RCSALES.categoryType,RCSALES.category,RCSALES.cost,RCSALES.margin;
+        raise notice '----%: % % % %',RCSALES.categoryType,RCSALES.category,ROUND(RCSALES.revenue),ROUND(RCSALES.cost),ROUND(RCSALES.margin);
     END LOOP;
     if yearAnt !=0 then
     TOTALYEAR = getTotals(yearAnt);
-    raise notice  '% % %', TOTALYEAR.acumRev, TOTALYEAR.acumCost, TOTALYEAR.acumMargin;
+    raise notice  '---------------------------------------------% % %', ROUND(TOTALYEAR.acumRev), ROUND(TOTALYEAR.acumCost), ROUND(TOTALYEAR.acumMargin);
     end if;
     CLOSE CSALES;
     END
 $$ LANGUAGE PLPGSQL;
 
-SELECT ReporteVentas(-1);
+SELECT ReporteVentas(2);
