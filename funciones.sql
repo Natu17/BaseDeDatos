@@ -36,21 +36,22 @@ CREATE OR REPLACE FUNCTION toDate(
 AS
 $$
 DECLARE
-    yearStr  TEXT;
-    monthStr TEXT;
-    dayStr   TEXT;
+    year_str  TEXT;
+    month_str TEXT;
+    day_str   TEXT;
 BEGIN
-    yearStr := SUBSTRING(quarter, 4, 7);
-    SELECT CAST(EXTRACT(MONTH FROM TO_DATE(SUBSTRING(month, 4, 6), 'Mon')) AS TEXT) INTO monthStr;
-    monthStr := LPAD(monthStr, 2, '0');
+    year_str := SUBSTRING(quarter, 4, 7);
+    month_str := CAST(EXTRACT(MONTH FROM TO_DATE(SUBSTRING(month, 4, 6), 'Mon')) AS TEXT);
+    month_str := LPAD(month_str, 2, '0');
     CASE (SUBSTRING(week, 1, 2))
-        WHEN 'W1' then dayStr := '01';
-        WHEN 'W2' then dayStr := '08';
-        WHEN 'W3' then dayStr := '15';
-        WHEN 'W4' then dayStr := '22';
-        WHEN 'W5' then dayStr := '29';
-        END CASE;
-    RETURN TO_DATE(yearStr || monthStr || dayStr, 'YYYYMMDD');
+        WHEN 'W1' then day_str := '01';
+        WHEN 'W2' then day_str := '08';
+        WHEN 'W3' then day_str := '15';
+        WHEN 'W4' then day_str := '22';
+        WHEN 'W5' then day_str := '29';
+    END CASE;
+
+    RETURN TO_DATE(year_str || month_str || day_str, 'YYYYMMDD');
 END;
 $$ LANGUAGE plpgsql;
 
@@ -60,8 +61,7 @@ $intToDef$
 BEGIN
     INSERT INTO definitiva
     VALUES (toDate(new.quarter, new.week, new.month), new.product_type, new.territory, new.sales_channel,
-            new.customer_type,
-            new.revenue, new.cost);
+            new.customer_type,new.revenue, new.cost);
     RETURN NEW;
 END;
 $intToDef$ LANGUAGE plpgsql;
@@ -104,38 +104,37 @@ SELECT MedianaMargenMovil(to_date('2011-09-01', 'YYYY-MM-DD'), 5);
 SELECT MedianaMargenMovil(to_date('2012-11-01','YYYY-MM-DD'),4)
 
 
-CREATE VIEW unionCat (year, category, revenue, cost, margin, categoryType)
-AS SELECT EXTRACT(YEAR FROM sales_date) as salesYear, product_type as category,
-sum(revenue) as revSum,sum(cost) as costSum,sum(revenue-cost) as diffSum, 'Product Type' as categoryType
+CREATE VIEW UNION_CAT (year, category, revenue, cost, margin, category_type)
+AS 
+SELECT EXTRACT(YEAR FROM sales_date) AS sales_year, product_type AS category,
+SUM(revenue) AS rev_sum, SUM(cost) AS cost_sum, SUM(revenue-cost) AS diff_sum, 'Product Type' AS category_type
 FROM definitiva
-GROUP BY category,salesYear
+GROUP BY category,sales_year
 
 UNION
 
-SELECT EXTRACT(YEAR FROM sales_date) as salesYear, customer_type as category,
-sum(revenue) as revSum,sum(cost) as costSum,sum(revenue-cost) as diffSum, 'Customer Type' as categoryType
+SELECT EXTRACT(YEAR FROM sales_date) AS sales_year, customer_type AS category,
+SUM(revenue) AS rev_sum, SUM(cost) AS cost_sum, SUM(revenue-cost) AS diff_sum, 'Customer Type' AS category_type
 FROM definitiva
-GROUP BY category,salesYear
+GROUP BY category,sales_year
 
 UNION
 
-SELECT EXTRACT(YEAR FROM sales_date) as salesYear, sales_channel as category,
-sum(revenue) as revSum,sum(cost) as costSum,sum(revenue-cost) as diffSum, 'Sales Channel' as categoryType
+SELECT EXTRACT(YEAR FROM sales_date) AS sales_year, sales_channel AS category,
+SUM(revenue) AS rev_sum, SUM(cost) AS cost_sum, SUM(revenue-cost) AS diff_sum, 'Sales Channel' AS category_type
 FROM definitiva
-GROUP BY category,salesYear
+GROUP BY category,sales_year
 
-ORDER BY salesYear,categoryType,category;
+ORDER BY sales_year,category_type,category;
 
 
-CREATE OR REPLACE FUNCTION getTotals(
-year IN INTEGER
-) RETURNS RECORD
+CREATE OR REPLACE FUNCTION getTotals(year IN INTEGER) RETURNS RECORD
 AS $$
 
 DECLARE
 totals RECORD;
 BEGIN
-	SELECT sum(revenue) as acumRev,sum(cost) as acumCost,sum(revenue-cost) as acumMargin
+	SELECT sum(revenue) as acum_rev,sum(cost) as acum_cost,sum(revenue-cost) as acum_margin
 	FROM definitiva
 	WHERE EXTRACT(YEAR FROM sales_date) = year
 	INTO totals;
@@ -151,41 +150,48 @@ AS
 $$
 DECLARE
     TOTALYEAR RECORD;
-    yearAnt integer;
+    year_ant INTEGER := -1;
     CSALES CURSOR FOR
-        SELECT year, category, revenue, cost, margin, categoryType
-        from unionCat where year < (SELECT min(year) from unionCat) + n;
+        SELECT year, category, revenue, cost, margin, category_type
+        from UNION_CAT where year < (SELECT MIN(year) from UNION_CAT) + n;
     RCSALES RECORD;
+    row_count INTEGER;
 BEGIN
     IF (n < 0) THEN
         raise notice 'La cantidad de años debe ser positiva';
         RETURN;
     END IF;
-    yearAnt = 0;
+    SELECT COUNT(*) FROM definitiva INTO row_count;
+    IF (n = 0 OR row_count = 0) THEN
+        RETURN;
+    END IF;
+
+    raise notice  '--------------------------------------------HISTORIC SALES REPORT---------------------------------------------------';
+    raise notice '----------------------------------------------------------------------------------------------------------------------';
+    raise notice  'Year--------Category-------------------------------------------Revenue------Cost------ Margin------------------------';
     OPEN CSALES;
     LOOP
-    FETCH CSALES INTO RCSALES;
-    EXIT WHEN NOT FOUND;
-    IF yearAnt=0 then
-        raise notice  '--------------------------------------------HISTORIC SALES REPORT---------------------------------------------------';
-        raise notice '---------------------------------------------------------------------------------------------------------------------------------------------';
-        raise notice  'Year-------------Category------------Revenue----------Cost---------------- Margin--------------------------';
-        SELECT RCSALES.year INTO yearAnt;
-        raise notice '%',RCSALES.year ;
-    ELSE IF yearAnt < RCSALES.year THEN
-        TOTALYEAR = getTotals(yearAnt);
-        raise notice  '---------------------------------------------% % %', ROUND(TOTALYEAR.acumRev), ROUND(TOTALYEAR.acumCost), ROUND(TOTALYEAR.acumMargin);
-        raise notice '---------------------------------------------------------------------------------------------------------------------------------------------';
-        SELECT RCSALES.year INTO yearAnt;
-        raise notice '%',RCSALES.year ;
-    END IF;
-    END IF;
-        raise notice '----%: % % % %',RCSALES.categoryType,RCSALES.category,ROUND(RCSALES.revenue),ROUND(RCSALES.cost),ROUND(RCSALES.margin);
+        FETCH CSALES INTO RCSALES;
+        EXIT WHEN NOT FOUND;
+        IF year_ant != RCSALES.year THEN
+            IF year_ant != -1 THEN
+            TOTALYEAR = getTotals(year_ant);
+            raise notice  '--------------------------------------------------------%   %   %', 
+            ROUND(TOTALYEAR.acum_rev), ROUND(TOTALYEAR.acum_cost), ROUND(TOTALYEAR.acum_margin);
+            END IF;
+            raise notice '----------------------------------------------------------------------------------------------------------------------';
+            raise notice '%   %:%                               %   %   %',
+            RCSALES.year, RCSALES.category_type,RCSALES.category,ROUND(RCSALES.revenue),ROUND(RCSALES.cost),ROUND(RCSALES.margin); 
+            year_ant := RCSALES.year;
+        ELSE
+            raise notice '%   %:%                               %   %   %',
+            '----', RCSALES.category_type,RCSALES.category,ROUND(RCSALES.revenue),ROUND(RCSALES.cost),ROUND(RCSALES.margin);
+        END IF;
     END LOOP;
-    if yearAnt !=0 then
-    TOTALYEAR = getTotals(yearAnt);
-    raise notice  '---------------------------------------------% % %', ROUND(TOTALYEAR.acumRev), ROUND(TOTALYEAR.acumCost), ROUND(TOTALYEAR.acumMargin);
-    end if;
+    IF year_ant != -1 THEN
+        TOTALYEAR = getTotals(year_ant);
+        raise notice  '--------------------------------------------------------%   %   %', ROUND(TOTALYEAR.acum_rev), ROUND(TOTALYEAR.acum_cost), ROUND(TOTALYEAR.acum_margin);
+    END IF;
     CLOSE CSALES;
     END
 $$ LANGUAGE PLPGSQL;
