@@ -175,7 +175,7 @@ BEGIN
         raise notice  '% % %', TOTALYEAR.acumRev, TOTALYEAR.acumCost, TOTALYEAR.acumMargin;
         SELECT RCSALES.year INTO yearAnt;
         raise notice '%',RCSALES.year ;
-    end if;
+    END IF;
     END IF;
         raise notice '%: % % %',RCSALES.categoryType,RCSALES.category,RCSALES.cost,RCSALES.margin;
     END LOOP;
@@ -187,4 +187,4 @@ BEGIN
     END
 $$ LANGUAGE PLPGSQL;
 
-SELECT ReporteVentas(2);
+SELECT ReporteVentas(-1);
