@@ -214,4 +214,3 @@ BEGIN
 END
 $$ LANGUAGE PLPGSQL;
 
-SELECT ReporteVentas(1);
